@@ -13,16 +13,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '11'
-      - name: Build
-        run: bash build_all.sh "${{ github.event.inputs.package_name }}" "${{ github.event.inputs.app_name }}"
-      - uses: actions/upload-artifact@v3
-        with:
-          name: Mod-APK-Signed
-          path: mod.apk
+      - run: ls -la
