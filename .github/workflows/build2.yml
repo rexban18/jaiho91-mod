@@ -16,4 +16,14 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-      - run: python3 --version
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      - run: java -version
+      - run: python3 -c "import requests; print('ok')"
+      - run: bash build_all.sh "${{ github.event.inputs.package_name }}" "${{ github.event.inputs.app_name }}"
+      - uses: actions/upload-artifact@v3
+        with:
+          name: Mod-APK-Signed
+          path: mod.apk
