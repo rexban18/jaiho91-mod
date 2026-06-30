@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       apk_url:
-        description: 'Original APK download URL'
-        required: true
+        description: 'Original APK URL (leave empty to use chunks from release)'
+        required: false
+        default: ''
       package_name:
         description: 'New package name'
         required: false
@@ -28,19 +29,55 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '11'
-      - name: Download APK
+
+      - name: Download full APK
+        if: github.event.inputs.apk_url != ''
         run: |
           curl -L -o original.apk "${{ github.event.inputs.apk_url }}"
           ls -lh original.apk
+
+      - name: Download & reassemble from chunks
+        if: github.event.inputs.apk_url == ''
+        run: |
+          python3 -c "
+import requests, json
+rel = requests.get('https://api.github.com/repos/${{ github.repository }}/releases/tags/v1',
+  headers={'Accept': 'application/vnd.github.v3+json'}).json()
+assets = rel.get('assets', [])
+chunks = sorted([a for a in assets if a['name'].startswith('apk_part_')], key=lambda x: x['name'])
+man = [a for a in assets if a['name'] == 'manifest.json']
+
+if man:
+  m = json.loads(requests.get(man[0]['url'], headers={'Accept': 'application/vnd.github.v3.raw'}).text)
+  for p in m['parts']:
+    fn = p['file']
+    a = [x for x in assets if x['name'] == fn][0]
+    data = requests.get(a['url'], headers={'Accept': 'application/vnd.github.v3.raw'}).content
+    with open('original.apk', 'ab') as out:
+      out.write(data)
+    print(f'  {fn} done ({len(data)} bytes)')
+  print(f'Reassembled: {os.path.getsize(\"original.apk\")} bytes')
+else:
+  for c in chunks:
+    data = requests.get(c['url'], headers={'Accept': 'application/vnd.github.v3.raw'}).content
+    with open('original.apk', 'ab') as out:
+      out.write(data)
+    print(f'  {c[\"name\"]} done ({len(data)} bytes)')
+  print(f'Reassembled: {os.path.getsize(\"original.apk\")} bytes')
+import os
+          ls -lh original.apk
+          "
+
       - name: Build MOD
         run: |
           python3 build.py original.apk \
             --package "${{ github.event.inputs.package_name }}" \
             --name "${{ github.event.inputs.app_name }}" \
             -o mod.apk
-      - name: Upload Artifact
+
+      - name: Upload Signed APK
         uses: actions/upload-artifact@v3
         with:
-          name: Mod-APK
+          name: Mod-APK-Signed
           path: mod*.apk
           retention-days: 7
