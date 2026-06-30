@@ -4,16 +4,22 @@ import os, sys, json, requests, zipfile
 
 REPO = os.environ.get('GITHUB_REPOSITORY', 'rexban18/jaiho91-mod')
 TOKEN = os.environ.get('GITHUB_TOKEN', '')
-
 headers = {'Accept': 'application/vnd.github.v3+json'}
 if TOKEN:
     headers['Authorization'] = f'token {TOKEN}'
 
-rel_url = f'https://api.github.com/repos/{REPO}/releases/tags/v1'
-rel = requests.get(rel_url, headers=headers).json()
+if '--verify' in sys.argv:
+    with zipfile.ZipFile('original.apk') as z:
+        names = z.namelist()
+        print(f'Entries: {len(names)}')
+        assert 'AndroidManifest.xml' in names
+        assert 'classes.dex' in names
+    print('Valid APK!')
+    sys.exit(0)
+
+rel = requests.get(f'https://api.github.com/repos/{REPO}/releases/tags/v1', headers=headers).json()
 assets = rel.get('assets', [])
 
-# Try full APK first
 apk = [a for a in assets if a['name'].endswith('.apk') and a['size'] > 1000000]
 if apk:
     url = apk[0]['url']
@@ -23,10 +29,9 @@ if apk:
     print(f'Downloaded full APK: {len(data)} bytes')
     sys.exit(0)
 
-# Fallback: reassemble from chunks
 chunks = sorted([a for a in assets if a['name'].startswith('apk_part_')], key=lambda x: x['name'])
 if not chunks:
-    print('ERROR: No APK or chunks found in release!')
+    print('ERROR: No APK or chunks found!')
     sys.exit(1)
 
 with open('original.apk', 'wb') as out:
@@ -38,7 +43,6 @@ with open('original.apk', 'wb') as out:
 size = os.path.getsize('original.apk')
 print(f'Reassembled: {size} bytes')
 
-# Verify it's a valid zip/APK
 with zipfile.ZipFile('original.apk') as z:
     assert 'AndroidManifest.xml' in z.namelist()
 print('Valid APK!')

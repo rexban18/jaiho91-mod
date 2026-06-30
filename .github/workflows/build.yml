@@ -30,15 +30,7 @@ jobs:
         run: python3 download_apk.py
 
       - name: Verify APK
-        run: python3 -c "
-import zipfile
-with zipfile.ZipFile('original.apk') as z:
-    names = z.namelist()
-    print(f'Entries: {len(names)}')
-    assert 'AndroidManifest.xml' in names
-    assert 'classes.dex' in names
-print('OK')
-"
+        run: python3 download_apk.py --verify
 
       - name: Build MOD
         run: |
