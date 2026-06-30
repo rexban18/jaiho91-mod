@@ -1,0 +1,14 @@
+name: Build MOD APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: 'New package name'
+        default: 'com.jaiho.mod'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "test ${{ github.event.inputs.package_name }}"
