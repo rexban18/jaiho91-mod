@@ -1,0 +1,4 @@
+*.apk
+*.jar
+__pycache__/
+*.pyc
