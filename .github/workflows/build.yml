@@ -5,29 +5,32 @@ on:
     inputs:
       package_name:
         description: 'New package name'
-        required: false
         default: 'com.jaiho.mod'
       app_name:
         description: 'New app name'
-        required: false
         default: 'Jaiho Pro'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - run: echo "Build started"
+
       - uses: actions/checkout@v3
+
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
 
-      - name: Download and reassemble APK
-        run: python3 download_apk.py
+      - run: python3 -c "import requests; print('requests ok')"
+
+      - run: python3 download_apk.py
 
       - name: Verify APK
         run: python3 download_apk.py --verify
