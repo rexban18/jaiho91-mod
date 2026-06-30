@@ -3,10 +3,6 @@ name: Build MOD APK
 on:
   workflow_dispatch:
     inputs:
-      apk_url:
-        description: 'Original APK URL (leave empty to use chunks from release)'
-        required: false
-        default: ''
       package_name:
         description: 'New package name'
         required: false
@@ -30,52 +26,35 @@ jobs:
           distribution: 'temurin'
           java-version: '11'
 
-      - name: Download full APK
-        if: github.event.inputs.apk_url != ''
-        run: |
-          curl -L -o original.apk "${{ github.event.inputs.apk_url }}"
-          ls -lh original.apk
-
-      - name: Download & reassemble from chunks
-        if: github.event.inputs.apk_url == ''
+      - name: Download original APK from release
         run: |
           python3 -c "
-import requests, json
+import os, requests
 rel = requests.get('https://api.github.com/repos/${{ github.repository }}/releases/tags/v1',
-  headers={'Accept': 'application/vnd.github.v3+json'}).json()
+  headers={'Accept': 'application/vnd.github.v3+json', 'Authorization': 'token ${{ secrets.GITHUB_TOKEN }}'}).json()
 assets = rel.get('assets', [])
-chunks = sorted([a for a in assets if a['name'].startswith('apk_part_')], key=lambda x: x['name'])
-man = [a for a in assets if a['name'] == 'manifest.json']
-
-if man:
-  m = json.loads(requests.get(man[0]['url'], headers={'Accept': 'application/vnd.github.v3.raw'}).text)
-  for p in m['parts']:
-    fn = p['file']
-    a = [x for x in assets if x['name'] == fn][0]
-    data = requests.get(a['url'], headers={'Accept': 'application/vnd.github.v3.raw'}).content
-    with open('original.apk', 'ab') as out:
-      out.write(data)
-    print(f'  {fn} done ({len(data)} bytes)')
-  print(f'Reassembled: {os.path.getsize(\"original.apk\")} bytes')
-else:
-  for c in chunks:
-    data = requests.get(c['url'], headers={'Accept': 'application/vnd.github.v3.raw'}).content
-    with open('original.apk', 'ab') as out:
-      out.write(data)
-    print(f'  {c[\"name\"]} done ({len(data)} bytes)')
-  print(f'Reassembled: {os.path.getsize(\"original.apk\")} bytes')
-import os
+apk = [a for a in assets if a['name'].endswith('.apk')]
+if not apk:
+  # fallback: use direct download
+  import sys
+  print('No APK found in release assets')
+  sys.exit(1)
+url = apk[0]['url']
+print(f'Downloading {apk[0][\"name\"]} ({apk[0][\"size\"]} bytes)')
+import subprocess
+subprocess.run(['curl', '-sL', '-H', 'Accept: application/octet-stream', '-o', 'original.apk', url], check=True)
+print(f'Downloaded: {os.path.getsize(\"original.apk\")} bytes')
+" 2>&1
           ls -lh original.apk
-          "
 
-      - name: Build MOD
+      - name: Build MOD APK
         run: |
           python3 build.py original.apk \
             --package "${{ github.event.inputs.package_name }}" \
             --name "${{ github.event.inputs.app_name }}" \
             -o mod.apk
 
-      - name: Upload Signed APK
+      - name: Upload signed APK
         uses: actions/upload-artifact@v3
         with:
           name: Mod-APK-Signed
